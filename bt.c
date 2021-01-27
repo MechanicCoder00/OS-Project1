@@ -1,199 +1,272 @@
-#include <ctype.h>
+//#include <ctype.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <getopt.h>
 #include <string.h>
-#include <limits.h>
+#include <errno.h>
 
 /*
-
- Working: line 148 only getting last line and not any others
-
-Todo:
-    Start git for this project
- 1. Get unix commands for each option and print within a loop as long as there is a path in the queue
- 2. Build a queue for storing file paths
- 3.
- 4. Redo error messages(using perror)
- 5. comment everything
-
- Notes:
- 1. Breadthfirst function-fill queue/call printOutput/dequeue
- 2. printOutput-output of current path as per options selected into buffer and prints
- 3.
-
-
-
-
-
-
+ * Project : Operating systems assignment 1
+ * Author : Scott Tabaka
+ * Date Due : 2/10/2020
+ * Course : CMPSCI 4760
+ * Purpose : Print out various information for all files and directories within a directory using unix.
  */
 
+int hflag=0;
+int Lflag=0;
+int tflag=0;
+int pflag=0;
+int iflag=0;
+int uflag=0;
+int gflag=0;
+int sflag=0;
+int dflag=0;
+int opt;
+char command[100];
+static char error[100];
+static char usage[100];
 
-//breadthfirst(root)
-//{
-//    enqueue(root);
-//    while (!empty(queue))
-//    {
-//        next = dequeue(queue);
-//        for each node directly below next
-//        {
-//            visit(node);
-//            if (isa_directory(node))enqueue(node);
-//        }
-//    }
-//}
-
-//*****************************
-
-struct Queue
+struct Queue                        //queue struct
 {
     int front, rear, size;
     unsigned capacity;
-//    int* array;
     char** array;
 };
 
-struct Queue* createQueue(unsigned capacity)
+struct Queue* createQueue(unsigned capacity)        //function to create queue
 {
-    struct Queue* queue = (struct Queue*) malloc(sizeof(struct Queue));
+    struct Queue* queue = malloc(sizeof(struct Queue));
     queue->capacity = capacity;
     queue->front = queue->size = 0;
     queue->rear = capacity - 1;
-//    queue->array = (int*) malloc(queue->capacity * sizeof(int));
-    queue->array = (char**) malloc(queue->capacity * sizeof(char**));
+    queue->array = malloc(queue->capacity * sizeof(char*));
     return queue;
 }
+
 int isFull(struct Queue* queue)
 {
     return (queue->size == queue->capacity);
 }
 
-// Queue is empty when size is 0
 int isEmpty(struct Queue* queue)
 {
     return (queue->size == 0);
 }
 
-// Function to add an item to the queue.
-// It changes rear and size
-//void enqueue(struct Queue* queue, int item)
-void enqueue(struct Queue* queue, char* item)
+void enqueue(struct Queue* queue, char* item)   //adds an item to the back of the queue
 {
     if (isFull(queue))
+    {
         return;
+    }
     queue->rear = (queue->rear + 1)%queue->capacity;
-//    queue->array[queue->rear] = item;
     queue->array[queue->rear] = item;
     queue->size = queue->size + 1;
-//    printf("%s enqueued to queue\n", item);
 }
-char* dequeue(struct Queue* queue)
+char* dequeue(struct Queue* queue)          //removes an item from the front of the queue
 {
     if (isEmpty(queue))
-//        return INT_MIN;
-        return 0;
-//    int item = queue->array[queue->front];
-    static char item[10];
+    {
+        return "";
+    }
     queue->front = (queue->front + 1)%queue->capacity;
     queue->size = queue->size - 1;
-    return item;
+    return "";
 }
 
-// Function to get front of queue
-char* front(struct Queue* queue)
+char* front(struct Queue* queue)            //returns the char array stored on the front of the array
 {
     if (isEmpty(queue))
-//        return INT_MIN;
-        return 0;
+    {
+        return "";
+    }
     return queue->array[queue->front];
 }
 
-// Function to get rear of queue
-char* rear(struct Queue* queue)
-{
-    if (isEmpty(queue))
-        return 0;
-    return queue->array[queue->rear];
-}
-
-//*****************************
-
-char* addToBuffer(const char* cmd)
+char* getCmdOutput(const char *cmd)          //Will return the output of a unix system command as a char[]
 {
     FILE *fp = popen(cmd, "r");
     static char output[40];
     if (fp != NULL)
     {
-
         if (fgets(output, sizeof(output), fp))
         {
-            output[strcspn(output, "\n\r")] = 0;
-            //strcat(buffer,output);
+            output[strcspn(output, "\n\r")] = 0;        //strips the newline off of a string
         }
         pclose(fp);
     }
     return output;
 }
 
-void queueAllFD(struct Queue* queue)
+void breadthFirst(struct Queue *queue, char *path)     //Function to capture all files and dir paths and enter them into the queue
 {
-    FILE *fp = popen("ls -1", "r");
-    char fileName[200];
-//    char *cp = malloc(1000);
+    static char cmd[40];
+    strcpy(cmd,"ls -1");
+    strcat(cmd," ");
+    strcat(cmd,path);
+
+    FILE *fp = popen(cmd, "r");             //Takes a unix command and returns the output into a file pointer
+    static char temp[100];
 
     if (fp != NULL)
     {
-//        static char fileName[60];
-        while (fgets(fileName, sizeof(fileName), fp))
+        while (fgets(temp, sizeof(temp), fp))       //traverses the output line by line and stores it in the variable "temp"
         {
+            char *fileName = malloc(100);
+            temp[strcspn(temp, "\n\r")] = 0;
 
-//            enqueue(queue, "blah");
-//            printf("Front item is %s", front(queue));
-
-            printf("fileName %s", fileName);
-            fileName[strcspn(fileName, "\n\r")] = 0;
-//            strcat(fileName,"\0");
-
-
-//            char temp[60];
-//            strcpy(temp, fileName);
-//            enqueue(queue, temp);
-
-            enqueue(queue, fileName);
-            printf("Front item is %s\n\n", front(queue));
-
-//            strcpy(enqueue(queue,cp ),fileName);
+            if(strcmp(path, "") != 0)          //If path is not empty copy path into "fileName"
+            {
+                strcpy(fileName,path);
+                strcat(fileName, "/");
+            }
+            strcat(fileName, temp);             //Append path to a file/directory onto the current path directory
+            enqueue(queue, fileName);           //Adds "fileName into queue
         }
         pclose(fp);
     }
 }
 
+int isDirectory(char *path)        //Checks if argument is a directory(1) or not(0)
+{
+    static char temp5[100];
+    strcpy(temp5, "stat --format=%A");
+    strcat(temp5, " ");
+    strcat(temp5, path);
+    strcat(temp5, " | awk '{print substr($0,1,1)}'");
+
+    if(strcmp("d", getCmdOutput(temp5))==0)         //Checks if dir
+    {
+        return 1;
+    } else
+    {
+        return 0;
+    }
+}
+
+void printInfo(char *path)      //This function prints info for each path argument given depending on options
+{
+    char type[20];                  //char arrays for storing each option info output
+    char perm[20];
+    char link[20];
+    char uid[20];
+    char gid[20];
+    char size[20];
+    char time[20];
+
+    if (hflag == 1)         //This prints info for the help option
+    {
+        printf("%s\n", usage);
+        printf("Prints all file and directories in breadth order with selected options.\n\n");
+        printf("-h Print a help message and exit.\n");
+        printf("-L Follow symbolic links\n");
+        printf("-t Print information on ﬁle type\n");
+        printf("-p Print permission bits(r-read w-write x-execute)\n");
+        printf("-i Print the number of links to ﬁle in inode table\n");
+        printf("-u Print the UID associated with the ﬁle\n");
+        printf("-g Print the GID associated with the ﬁle\n");
+        printf("-s Print the size of ﬁle in bytes\n");
+        printf("-d Show the time of last modiﬁcation\n");
+        printf("-l Print information on the ﬁle as if all of the options are speciﬁed\n");
+
+        exit(0);
+    }
+
+    if (Lflag == 1)                 //Follow links(Not functional)
+    {
+//        fprintf(stderr, "Lflag!\n");
+//        system("readlink -f bt.c");
+    }
+
+    if (tflag == 1)                 //File type
+    {
+        strcpy(command, "stat --format=%A");
+        strcat(command, " ");
+        strcat(command, path);
+        strcat(command, " | awk '{print substr($0,1,1)}'");
+        strcpy(type, getCmdOutput(command));
+
+        printf("%-1s", type);
+
+        if (pflag == 0)             //Adds a space behind the file type output if permissions does not exist
+        {
+            printf(" ");
+        }
+    }
+    if (pflag == 1)                 //Permissions
+    {
+        strcpy(command, "stat --format=%A");
+        strcat(command, " ");
+        strcat(command, path);
+        strcat(command, " | awk '{print substr($0,2,10)}'");
+        strcpy(perm, getCmdOutput(command));
+
+        printf("%-9s ", perm);
+    }
+    if (iflag == 1)                 //Inode links to a file
+    {
+        strcpy(command, "stat --format=%h");
+        strcat(command, " ");
+        strcat(command, path);
+        strcpy(link, getCmdOutput(command));
+
+        printf("%-3s ", link);
+    }
+    if (uflag == 1)                 //User ID name
+    {
+        strcpy(command, "stat --format=%U");
+        strcat(command, " ");
+        strcat(command, path);
+        strcpy(uid, getCmdOutput(command));
+
+        printf("%-9s ", uid);
+    }
+    if (gflag == 1)                 //Group ID name
+    {
+        strcpy(command, "stat --format=%G");
+        strcat(command, " ");
+        strcat(command, path);
+        strcpy(gid, getCmdOutput(command));
+
+        printf("%-9s ", gid);
+    }
+    if (sflag == 1)                 //File size
+    {
+        strcpy(command, "ls -ldh");
+        strcat(command, " ");
+        strcat(command, path);
+        strcat(command, " | awk '{ print $5}'");
+        strcpy(size, getCmdOutput(command));
+
+        printf("%-5s ", size);
+    }
+    if (dflag == 1)                 //Last modification time
+    {
+        strcpy(command, "date +\"%b %d, %Y\" -r");
+        strcat(command, " ");
+        strcat(command, path);
+        strcpy(time, getCmdOutput(command));
+
+        printf("%-12s ", time);
+    }
+
+    printf("%-s\n", path);         //Prints the path and name for the current file/directory
+}
+
+
 int main (int argc, char *argv[])
 {
-    int hflag=0;
-    int Lflag=0;
-    int tflag=0;
-    int pflag=0;
-    int iflag=0;
-    int Iflag=0;
-    int uflag=0;
-    int gflag=0;
-    int sflag=0;
-    int dflag=0;
     int index;
-    int opt;
-    int iValue = 0;
-    static char buffer[1000];
-    char command[100];
-    char path[300];
-    strcpy(path, "./bt.c");
+    strcpy(error,argv[0]);
+    strcat(error,": Error");
 
-//    char *fileName[60];
+    strcpy(usage,"Usage: ");
+    strcat(usage,argv[0]);
+    strcat(usage," [-h] [-L -t -p -i -u -g -s -d | -l] [dirname]");
 
-    while ((opt = getopt(argc, argv, "hLtpiI:ugsdl")) != -1)		//loop for option selecting
+    while ((opt = getopt(argc, argv, "hLtpiugsdl")) != -1)		//loop for option selecting
     {
         switch (opt)
         {
@@ -212,11 +285,6 @@ int main (int argc, char *argv[])
             case 'i':
                 iflag = 1;
                 break;
-            case 'I':
-                Iflag = 1;
-                iValue = atoi(optarg);
-//                iValue = strtol(optarg);
-                break;
             case 'u':
                 uflag = 1;
                 break;
@@ -232,141 +300,69 @@ int main (int argc, char *argv[])
             case 'l':
                 Lflag = dflag = gflag = iflag = pflag = sflag = tflag = uflag = 1;
                 break;
-            case '?':
-                if (optopt == 'I')
-                {
-                    fprintf (stderr, "Option -%c requires an argument.\n", optopt);
-                }
-                else if (isprint (optopt))
-                {
-                    fprintf (stderr, "Unknown option `-%c'.\n", optopt);
-                }
-                else
-                {
-                    fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
-                }
-
             default:
-                fprintf(stderr, "Usage: %s [-h] [-L -d -g -i -p -s -t -u -In | -l] [dirname]\n", argv[0]);
+                fprintf(stderr, "%s\n", usage);
                 exit(EXIT_FAILURE);
         }
     }
 
-    struct Queue* queue = createQueue(1000);
-    queueAllFD(queue);
-
-//    for (index = optind; index < argc; index++)
-//    {
-//        printf ("Non-option argument %s\n", argv[index]);
-//    }
-
-    if(hflag == 1)
+    if(argc-optind > 1)             //Checks to make sure there is only 1 argument, if any, after options
     {
-        fprintf(stderr, "hflag!\n");
-        exit(0);
+        printf("%s: Too many arguments\n",error);
+        fprintf(stderr, "%s\n", usage);
+        exit(EXIT_FAILURE);
     }
 
+    struct Queue* queue = createQueue(1000);        //Creates queue
+    char path[200];
+    strcpy(path, "");
+    char *temp2 = malloc(strlen(path));
 
-    if (Lflag == 1)                 //Follow links
+    for (index = optind; index < argc; index++)
     {
-//        fprintf(stderr, "Lflag!\n");
-//        system("readlink -f bt.c");
-    }
-    if (Iflag == 1)                 //Number of spaces for indenting
-    {
-        fprintf(stderr, "Iflag!\n");
-        fprintf(stdout, "Ivalue: %d", iValue);
-    }
+        int result;
+        result = access(argv[index], F_OK);         //Checks if a valid file or directory
 
-    if (tflag == 1)                 //File type
-    {
-        strcpy(command, "stat --format=%A");
-        strcat(command," ");
-        strcat(command,path);
-        strcat(command," | awk '{print substr($0,1,1)}'");
-        strcat(buffer,addToBuffer(command));
-
-        if(pflag == 0)
+        if ( result == 0 )
         {
-            strcat(buffer," ");
+            strcpy(path,argv[index]);
+        }
+        else
+        {
+            perror(error);                          //perror message if file/directory not valid
+            exit(EXIT_FAILURE);
         }
     }
-    if (pflag == 1)                 //Permissions
-    {
-        strcpy(command, "stat --format=%A");
-        strcat(command," ");
-        strcat(command,path);
-        strcat(command," | awk '{print substr($0,2,10)}'");
-        strcat(buffer,addToBuffer(command));
-        strcat(buffer," ");
-    }
-    if (iflag == 1)                 //Inode links to a file
-    {
-        strcpy(command, "stat --format=%h");
-        strcat(command," ");
-        strcat(command,path);
-        strcat(buffer,addToBuffer(command));
-        strcat(buffer," ");
-    }
-    if (uflag == 1)                 //User ID name
-    {
-        strcpy(command, "stat --format=%U");
-        strcat(command," ");
-        strcat(command,path);
-        strcat(buffer,addToBuffer(command));
-        strcat(buffer," ");
-    }
-    if (gflag == 1)                 //Group ID name
-    {
-        strcpy(command, "stat --format=%G");
-        strcat(command," ");
-        strcat(command,path);
-        strcat(buffer,addToBuffer(command));
-        strcat(buffer," ");
-    }
-    if (sflag == 1)                 //File size
-    {
-        strcpy(command, "ls -lah");
-        strcat(command," ");
-        strcat(command,path);
-        strcat(command," | awk '{ print $5}'");
-        strcat(buffer,addToBuffer(command));
-        strcat(buffer," ");
-    }
-    if (dflag == 1)                 //Last modification time
-    {
-        strcpy(command, "date +\"%b %d, %Y\" -r");
-        strcat(command," ");
-        strcat(command,path);
-        strcat(buffer,addToBuffer(command));
-        strcat(buffer," ");
-    }
 
-    strcat(buffer,"\n");
-    printf("%s", buffer);
-
-
-
-
-
-//    enqueue(queue, "one");
-//    enqueue(queue, "two");
-//    enqueue(queue, "three");
-//    enqueue(queue, "four");
-//    dequeue(queue);
-//    printf("Front item is %s\n", front(queue));
-//    printf("Rear item is %s\n", rear(queue));
-//    printf("Queue size: %d\n",queue->size);
+    strcpy(temp2,path);
+    enqueue(queue, temp2);
 
     while(queue->size > 0)
     {
-        printf("Front item is %s\n", front(queue));
-        dequeue(queue);
-        printf("Queue size: %d\n",queue->size);
+        strcpy(path,front(queue));                 //reading from queue and stores into "path"
+
+        if(strcmp(path, "") != 0)                       //If path is not empty
+        {
+            if(isDirectory(path) == 1)                  //And if path is a directory
+            {
+                breadthFirst(queue, path);              //Call breadthfirst function
+            }
+        }else
+        {
+            breadthFirst(queue, path);                  //Call breadthfirst function if path is empty
+        }
+
+        if(strcmp(path, "") != 0)                       //If path is not empty print info
+        {
+            printInfo(path);
+        }
+
+        dequeue(queue);                                 //Call dequeue
     }
 
-    printf("Rear item is %s\n", rear(queue));
+    free(queue->array);                         //free allocated memory
+    free(queue);
+    free(temp2);
 
     return 0;
 }
-
